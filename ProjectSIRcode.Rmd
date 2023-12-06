@@ -1,0 +1,173 @@
+---
+title: "Covid SIR models project"
+author: "Oliver Laufenberg"
+date: "2023-11-29"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+This project uses Wisconsin DHS (Department of Health Services) data to compare different SIR model variants
+
+This first section reads in the data from the provided hospitalization data between April 1st 2021, and December 31st 2022
+```{r}
+rm(list = ls()) #clear all
+library(readxl)
+Covid_data = read_excel("Covid HX ICU Patients Table.xlsx")
+Covid_data = head(Covid_data, 728) #first two years only
+Covid_data = tail(Covid_data, (nrow(Covid_data) - 88)) #Starting in april, 88 days after the start of the year, the data was weird before then
+Covid_data
+
+Hospital_data = Covid_data[5] #Using only the inpatient hospitalizations
+plot(1:nrow(Hospital_data), t(Hospital_data))
+
+```
+
+
+```{r}
+# Parameters
+beta=0.027   # infection rate
+gamma=0.007  # recovery rate
+I0=(Hospital_data[[1]][1])/N    # initial proportion of infected individuals
+S0=1-I0    # initial proportion of susceptible individuals
+R0=0       # initial proportion of recovered individuals
+N=5896      # total population of Wisconsin, 5.896 million
+days=nrow(Hospital_data)    # simulation time in days
+
+# Initialize vector for S, I, and R
+SIR=matrix(0, ncol = 3, nrow = days)
+SIR[1, ]=c(S0 * N, I0 * N, R0 * N)
+
+# Run SIR model
+for (t in 2:days) {
+  dS=-beta * SIR[t-1, 1] * SIR[t-1, 2] / N
+  dI=(beta * SIR[t-1, 1] * SIR[t-1, 2] / N) - gamma * SIR[t-1, 2]
+  dR=gamma * SIR[t-1, 2]
+  
+  SIR[t, ]=SIR[t-1, ] + c(dS, dI, dR)
+}
+
+# Plotting the results
+library(ggplot2)
+
+sir_result=data.frame(Time = 1:days, SIR)
+sir_result = cbind(sir_result,Hospital_data) #attaching hospitalization data to plot against model
+colnames(sir_result)[2:5]=c("Susceptible", "Infected", "Recovered", "Hospitalizations")
+head(sir_result)
+
+ggplot(sir_result, aes(x = Time)) +
+  geom_point(aes(y = Susceptible, color = "Susceptible", shape = "Susceptible")) +
+  geom_point(aes(y = Infected, color = "Infected", shape = "Infected")) +
+  geom_point(aes(y = Recovered, color = "Recovered", shape = "Recovered")) +
+  geom_point(aes(y = Hospitalizations, color = "Hospitalizations", shape = "Hospitalizations")) +
+  labs(title = "SIR Model",
+       x = "Time",
+       y = "People in each group, 100 thousands (excluding hospitalizations)")
+  #scale_color_manual(values = c("Susceptible" = "blue", "Infected" = "red", "Recovered" = "green"))
+
+
+```
+Here this demonstrates that an SIR model doesn't really capture the full picture, but can be decent if we choose the right coefficients and scale
+
+To add some additional complexity, we can examine an SIER model, where individuals are exposed to a disease, but not infectious to others for a time period
+```{r}
+# Parameters
+beta=0.027   # infection (exposure) rate
+gamma=0.007  # recovery rate
+sigma=0.3   # exposed becoming infectious rate
+I0=(Hospital_data[[1]][1])/N    # initial proportion of infected individuals
+S0=1-I0    # initial proportion of susceptible individuals
+R0=0       # initial proportion of recovered individuals
+E0=0       # initial proportion of exposed indivuduals
+N=5896      # total population of Wisconsin, 5.896 million
+days=nrow(Hospital_data)    # simulation time in days
+
+# Initialize vector for S, I, and R
+SIR=matrix(0, ncol = 4, nrow = days)
+SIR[1, ]=c(S0 * N, E0 * N, I0 * N, R0 * N)
+
+# Run SIR model
+for (t in 2:days) {
+  dS=-beta * SIR[t-1, 1] * SIR[t-1, 3] / N
+  dE=(beta * SIR[t-1, 1] * SIR[t-1, 3] / N) - (sigma * SIR[t-1, 2])
+  dI=(sigma * SIR[t-1, 2]) - (gamma * SIR[t-1, 3])
+  dR=gamma * SIR[t-1, 3]
+  
+  SIR[t, ]=SIR[t-1, ] + c(dS, dE, dI, dR)
+}
+
+
+# Plotting the results
+library(ggplot2)
+
+sir_result=data.frame(Time = 1:days, SIR)
+sir_result = cbind(sir_result,Hospital_data) #attaching hospitalization data to plot against model
+colnames(sir_result)[2:6]=c("Susceptible", "Exposed", "Infected", "Recovered", "Hospitalizations")
+head(sir_result)
+
+ggplot(sir_result, aes(x = Time)) +
+  geom_point(aes(y = Susceptible, color = "Susceptible", shape = "Susceptible")) +
+  geom_point(aes(y = Exposed, color = "Exposed", shape = "Exposed")) + 
+  geom_point(aes(y = Infected, color = "Infected", shape = "Infected")) +
+  geom_point(aes(y = Recovered, color = "Recovered", shape = "Recovered")) +
+  geom_point(aes(y = Hospitalizations, color = "Hospitalizations", shape = "Hospitalizations")) +
+  labs(title = "SEIR Model",
+       x = "Time",
+       y = "People in each group, 100 thousands (excluding hospitalizations)")
+
+
+```
+Not really very different, 
+
+
+Next we're going to look at an SIRI model, where people can be infected again after recovering
+```{r}
+# Parameters
+beta=0.027   # infection rate
+gamma=0.007  # recovery rate
+betaPrime = 0.0027 #infection rate of people who have been infected previously
+I0=(Hospital_data[[1]][1])/N    # initial proportion of infected individuals
+S0=0.99    # initial proportion of susceptible individuals
+R0=0       # initial proportion of recovered individuals
+Iprime0=0  # initial proportion of individuals infected more than once
+Rprime0=0  # initial population of individuals recovered more than once
+N=5896      # total population of Wisconsin, 5.896 million
+days=nrow(Hospital_data)    # simulation time in days
+
+# Initialize vector for S, I, and R
+SIRI=matrix(0, ncol = 4, nrow = days)
+SIRI[1, ]=c(S0 * N, I0 * N, R0 * N, Iprime0 * N)
+
+# Run SIR model
+for (t in 2:days) {
+  dS=-((beta * SIRI[t-1, 1]) * (SIRI[t-1, 2] + SIRI[t-1, 4])/ N)
+  dI=((beta * SIRI[t-1, 1]) * (SIRI[t-1, 2] + SIRI[t-1, 4])/ N) - gamma * SIRI[t-1, 2]
+  dR=(gamma * SIRI[t-1, 2]) + (gamma * SIRI[t-1, 4]) - ((betaPrime * SIRI[t-1, 3]) * (SIRI[t-1, 2] + SIRI[t-1, 4]) / N)
+  dIprime=((betaPrime * SIRI[t-1, 3]) * (SIRI[t-1, 2] + SIRI[t-1, 4]) / N) - gamma * SIRI[t-1, 4]
+  SIRI[t, ]=SIRI[t-1, ] + c(dS, dI, dR, dIprime)
+}
+
+# Plotting the results
+library(ggplot2)
+
+sir_result=data.frame(Time = 1:days, SIRI)
+sir_result = cbind(sir_result,Hospital_data) #attaching hospitalization data to plot against model
+colnames(sir_result)[2:6]=c("Susceptible", "Infected", "Recovered", "Reinfected", "Hospitalizations")
+sir_result$Infected = sir_result$Reinfected + sir_result$Infected
+head(sir_result)
+tail(sir_result)
+
+ggplot(sir_result, aes(x = Time)) +
+  geom_point(aes(y = Susceptible, color = "Susceptible", shape = "Susceptible")) +
+  geom_point(aes(y = Infected, color = "Infected", shape = "Infected")) +
+  geom_point(aes(y = Recovered, color = "Recovered", shape = "Recovered")) +
+  geom_point(aes(y = Hospitalizations, color = "Hospitalizations", shape = "Hospitalizations")) +
+  #geom_point(aes(y = MultiInfected, color = "MultiInfected", shape = "MultiInfected")) +
+  labs(title = "SIRI Model",
+       x = "Time",
+       y = "People in each group, 100 thousands (excluding hospitalizations)")
+
+
+```
+
