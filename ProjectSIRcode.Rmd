@@ -27,12 +27,12 @@ plot(1:nrow(Hospital_data), t(Hospital_data))
 
 ```{r}
 # Parameters
+N=5896      # total population of Wisconsin, 5.896 million
 beta=0.027   # infection rate
 gamma=0.007  # recovery rate
 I0=(Hospital_data[[1]][1])/N    # initial proportion of infected individuals
 S0=1-I0    # initial proportion of susceptible individuals
 R0=0       # initial proportion of recovered individuals
-N=5896      # total population of Wisconsin, 5.896 million
 days=nrow(Hospital_data)    # simulation time in days
 
 # Initialize vector for S, I, and R
@@ -73,6 +73,7 @@ Here this demonstrates that an SIR model doesn't really capture the full picture
 To add some additional complexity, we can examine an SIER model, where individuals are exposed to a disease, but not infectious to others for a time period
 ```{r}
 # Parameters
+N=5896      # total population of Wisconsin, 5.896 million
 beta=0.027   # infection (exposure) rate
 gamma=0.007  # recovery rate
 sigma=0.3   # exposed becoming infectious rate
@@ -80,7 +81,6 @@ I0=(Hospital_data[[1]][1])/N    # initial proportion of infected individuals
 S0=1-I0    # initial proportion of susceptible individuals
 R0=0       # initial proportion of recovered individuals
 E0=0       # initial proportion of exposed indivuduals
-N=5896      # total population of Wisconsin, 5.896 million
 days=nrow(Hospital_data)    # simulation time in days
 
 # Initialize vector for S, I, and R
@@ -124,6 +124,7 @@ Not really very different,
 Next we're going to look at an SIRI model, where people can be infected again after recovering
 ```{r}
 # Parameters
+N=5896      # total population of Wisconsin, 5.896 million
 beta=0.027   # infection rate
 gamma=0.007  # recovery rate
 betaPrime = 0.0027 #infection rate of people who have been infected previously
@@ -132,7 +133,6 @@ S0=0.99    # initial proportion of susceptible individuals
 R0=0       # initial proportion of recovered individuals
 Iprime0=0  # initial proportion of individuals infected more than once
 Rprime0=0  # initial population of individuals recovered more than once
-N=5896      # total population of Wisconsin, 5.896 million
 days=nrow(Hospital_data)    # simulation time in days
 
 # Initialize vector for S, I, and R
